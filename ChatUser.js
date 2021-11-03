@@ -1,3 +1,5 @@
+const axios = require('axios');
+
 /** Functionality related to chatting. */
 
 // Room is an abstraction of a chat channel
@@ -33,7 +35,7 @@ class ChatUser {
     this.room.join(this);
     this.room.broadcast({
       type: 'note',
-      text: `${this.name} joined "${this.room.name}".`
+      text: `${this.name} joined "${this.room.name}".`,
     });
   }
 
@@ -43,8 +45,28 @@ class ChatUser {
     this.room.broadcast({
       name: this.name,
       type: 'chat',
-      text: text
+      text: text,
     });
+  }
+
+  async handleJoke(jsonData) {
+    try {
+      let res = await axios.get('https://icanhazdadjoke.com/', {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'axios 0.21.1',
+        },
+      });
+      const joke = res.data.joke;
+      console.log(joke);
+      this.room.broadcast({
+        name: `JokeBot (${this.name})`,
+        type: 'chat',
+        text: joke,
+      });
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   /** Handle messages from client:
@@ -55,10 +77,14 @@ class ChatUser {
 
   handleMessage(jsonData) {
     let msg = JSON.parse(jsonData);
-
     if (msg.type === 'join') this.handleJoin(msg.name);
-    else if (msg.type === 'chat') this.handleChat(msg.text);
-    else throw new Error(`bad message: ${msg.type}`);
+    else if (msg.type === 'chat') {
+      if (msg.text === '/joke') {
+        this.handleJoke(msg.text);
+      } else {
+        this.handleChat(msg.text);
+      }
+    } else throw new Error(`bad message: ${msg.type}`);
   }
 
   /** Connection was closed: leave room, announce exit to others */
@@ -67,7 +93,7 @@ class ChatUser {
     this.room.leave(this);
     this.room.broadcast({
       type: 'note',
-      text: `${this.name} left ${this.room.name}.`
+      text: `${this.name} left ${this.room.name}.`,
     });
   }
 }
